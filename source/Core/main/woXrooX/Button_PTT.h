@@ -1,5 +1,5 @@
-#ifndef woXrooX_Button_PTT_H
-#define woXrooX_Button_PTT_H
+#ifndef woXrooX_Button_H
+#define woXrooX_Button_H
 
 #include <stdbool.h>
 
@@ -19,20 +19,8 @@
 
 static const char *BUTTON_TAG = "woXrooX::BUTTON:";
 
-// Exposed PTT (push-to-talks) flag (read by other tasks)
-// 1 = pressed/hold,
-// 0 = released
-static volatile int Button_PTT_FLAG_active = 0;
-
-
-////////////// Forward declarations
-
-// static inline void WS_send_PTT_protocol(bool active);
-
 
 ////////////// Helpers
-
-static inline bool get_Button_PTT_FLAG_active(void) { return Button_PTT_FLAG_active != 0; }
 
 // Background task: debounced PRESS/RELEASE + set flag
 static void button_task(void *arg) {
@@ -53,17 +41,13 @@ static void button_task(void *arg) {
 				last = level;
 
 				if (level == 0) {
-					Button_PTT_FLAG_active = 1;
 					ESP_LOGI(BUTTON_TAG, "PRESS");
 					LED_RED_on(500, -1);
-					// WS_send_PTT_protocol(true);
 				}
 
 				else {
-					Button_PTT_FLAG_active = 0;
 					ESP_LOGI(BUTTON_TAG, "RELEASE");
 					LED_RED_off();
-					// WS_send_PTT_protocol(false);
 				}
 			}
 		}
@@ -74,7 +58,7 @@ static void button_task(void *arg) {
 
 // Helper to start the task from app_main (or your init)
 static void button_start_task(void) {
-	xTaskCreate(button_task, "Button_PTT_task", 2048, NULL, 5, NULL);
+	xTaskCreate(button_task, "Button_task", 2048, NULL, 5, NULL);
 }
 
 ////////////// API
