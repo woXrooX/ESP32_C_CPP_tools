@@ -7,7 +7,7 @@ https://docs.espressif.com/projects/esp-idf/en/stable/esp32/index.html
 	cd esp-idf && ./install.sh
 
 3. Set environment variables for this shell (For this terminal window) (adds $IDF_PATH, $PATH etc.)
-	NOTE: You need to be in installed path to run this (/Users/woxroox/ESP/esp-idf)
+	NOTE: You need to be in installed path to run this (/Users/Me/ESP/esp-idf)
 	. ./export.sh
 
 4. Start a project
@@ -27,7 +27,7 @@ https://docs.espressif.com/projects/esp-idf/en/stable/esp32/index.html
 
 7. Monitor (opens a serial monitor)
 	idf.py monitor
-	command + ] stops the loop
+	control + ] stops the loop
 
 
 
