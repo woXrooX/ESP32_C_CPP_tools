@@ -1,3 +1,28 @@
+/*
+
+Usage:
+
+static button_type button;
+
+static void pressed_callback(button_type *button) { }
+static void released_callback(button_type *button) { }
+
+button.pin = GPIO_NUM_0;
+button.on_press = pressed_callback;
+button.on_release = released_callback;
+
+Button_start_task(&button);
+
+Or without using callbacks, handle events
+
+for (;;) {
+	if (button.pressed) { }
+	vTaskDelay(pdMS_TO_TICKS(10));
+}
+
+*/
+
+
 #ifndef woXrooX_Button_H
 #define woXrooX_Button_H
 
@@ -12,8 +37,6 @@
 
 ////////////// DEFINES
 
-#define BUTTON_PIN GPIO_NUM_27
-
 
 ////////////// GLOBALS
 
@@ -22,32 +45,57 @@ static const char *BUTTON_TAG = "woXrooX::BUTTON:";
 
 ////////////// Helpers
 
-// Background task: debounced PRESS/RELEASE + set flag
-static void button_task(void *arg) {
+typedef struct {
+	// which GPIO
+	gpio_num_t pin;
 
-	// idle high (pull-up)
-	int last = 1;
+	// Debounced raw level (0/1)
+	uint8_t level;
+
+	// current state (true/false)
+	// 0 = released
+	// 1 = pressed
+	bool pressed;
+
+	void (*on_press)(struct button_type *button);
+	void (*on_release)(struct button_type *button);
+} button_type;
+
+
+
+// Background task: debounced PRESS/RELEASE + set flag
+static void Button_task(void *arg) {
+	button_type *button = (button_type*)arg;
+
+	int last = gpio_get_level(button->pin);
+	button->level = (uint8_t)last;
+
+	// Active-low
+	button->pressed = (last == 0);
 
 	for (;;) {
-		int level = gpio_get_level(BUTTON_PIN);
+		int level = gpio_get_level(button->pin);
 
 		if (level != last) {
-			// debounce
+
+			// Debounce 20ms
 			vTaskDelay(pdMS_TO_TICKS(20));
 
-			level = gpio_get_level(BUTTON_PIN);
+			level = gpio_get_level(button->pin);
 
 			if (level != last) {
 				last = level;
 
-				if (level == 0) {
-					ESP_LOGI(BUTTON_TAG, "PRESS");
-					LED_RED_on(500, -1);
-				}
+				button->level = (uint8_t)level;
+				bool new_pressed = (level == 0);
 
-				else {
-					ESP_LOGI(BUTTON_TAG, "RELEASE");
-					LED_RED_off();
+				// Only act on edge
+				if (new_pressed != button->pressed) {
+					button->pressed = new_pressed;
+
+					if (button->pressed) if (button->on_press) button->on_press(button);
+
+					else if (button->on_release) button->on_release(button);
 				}
 			}
 		}
@@ -56,16 +104,13 @@ static void button_task(void *arg) {
 	}
 }
 
-// Helper to start the task from app_main (or your init)
-static void button_start_task(void) {
-	xTaskCreate(button_task, "Button_task", 2048, NULL, 5, NULL);
-}
 
 ////////////// API
 
-static void button_init(void) {
+static void Button_task_start(button_type *button) {
+	// Configure GPIO using button->pin
 	gpio_config_t io = {
-		.pin_bit_mask = 1ULL << BUTTON_PIN,
+		.pin_bit_mask = 1ULL << button->pin,
 		.mode = GPIO_MODE_INPUT,
 		.pull_up_en = GPIO_PULLUP_ENABLE,
 		.pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -73,7 +118,8 @@ static void button_init(void) {
 	};
 	gpio_config(&io);
 
-	button_start_task();
+	// start task (PASS THE POINTER)
+	xTaskCreate(Button_task, "Button_task", 2048, (void*)button, 5, NULL);
 }
 
 #endif
