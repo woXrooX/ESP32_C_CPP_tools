@@ -11,7 +11,7 @@ button.pin = GPIO_NUM_0;
 button.on_press = pressed_callback;
 button.on_release = released_callback;
 
-Button_start_task(&button);
+Button_task_start(&button);
 
 Or without using callbacks, handle events
 
@@ -27,6 +27,7 @@ for (;;) {
 #define woXrooX_Button_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -45,17 +46,17 @@ static const char *BUTTON_TAG = "woXrooX::BUTTON:";
 
 ////////////// Helpers
 
-typedef struct {
+typedef struct button_type {
 	// which GPIO
 	gpio_num_t pin;
 
 	// Debounced raw level (0/1)
-	uint8_t level;
+	volatile uint8_t level;
 
 	// current state (true/false)
 	// 0 = released
 	// 1 = pressed
-	bool pressed;
+	volatile bool pressed;
 
 	void (*on_press)(struct button_type *button);
 	void (*on_release)(struct button_type *button);
@@ -93,9 +94,13 @@ static void Button_task(void *arg) {
 				if (new_pressed != button->pressed) {
 					button->pressed = new_pressed;
 
-					if (button->pressed) if (button->on_press) button->on_press(button);
+					if (button->pressed) {
+						if (button->on_press) button->on_press(button);
+					}
 
-					else if (button->on_release) button->on_release(button);
+					else {
+						if (button->on_release) button->on_release(button);
+					}
 				}
 			}
 		}
