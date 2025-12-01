@@ -2,23 +2,27 @@
 
 Usage:
 
-static button_type button;
+	static button_type button;
 
-static void pressed_callback(button_type *button) { }
-static void released_callback(button_type *button) { }
+	void pressed_callback(button_type *button) {
+		LED_RED_on(500, -1);
+	}
+	void released_callback(button_type *button) {
+		LED_RED_off();
+	}
 
-button.pin = GPIO_NUM_0;
-button.on_press = pressed_callback;
-button.on_release = released_callback;
+	button.pin = GPIO_NUM_27;
+	button.on_press = pressed_callback;
+	button.on_release = released_callback;
 
-Button_task_start(&button);
+	Button_task_start(&button);
 
 Or without using callbacks, handle events
 
-for (;;) {
-	if (button.pressed) { }
-	vTaskDelay(pdMS_TO_TICKS(10));
-}
+	for (;;) {
+		if (button.pressed) { }
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
 
 */
 
@@ -57,6 +61,9 @@ typedef struct button_type {
 	// 0 = released
 	// 1 = pressed
 	volatile bool pressed;
+
+	// Button task
+	TaskHandle_t task;
 
 	void (*on_press)(struct button_type *button);
 	void (*on_release)(struct button_type *button);
@@ -113,6 +120,9 @@ static void Button_task(void *arg) {
 ////////////// API
 
 static void Button_task_start(button_type *button) {
+	// If already running a task, do not create new task
+	if (button->task) return;
+
 	// Configure GPIO using button->pin
 	gpio_config_t io = {
 		.pin_bit_mask = 1ULL << button->pin,
@@ -123,8 +133,14 @@ static void Button_task_start(button_type *button) {
 	};
 	gpio_config(&io);
 
-	// start task (PASS THE POINTER)
-	xTaskCreate(Button_task, "Button_task", 2048, (void*)button, 5, NULL);
+	// Start task
+	xTaskCreate(Button_task, "Button_task", 2048, (void*)button, 5, &button->task);
+}
+
+static void Button_task_stop(button_type *button) {
+	if (!button->task) return;
+	vTaskDelete(button->task);
+	button->task = NULL;
 }
 
 #endif
